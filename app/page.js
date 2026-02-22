@@ -41,7 +41,7 @@ export default function HomePage() {
   const [cuisine, setCuisine] = useState("all");
   const [city, setCity] = useState("all");
   const [sort, setSort] = useState("popular");
-  const [discoverSource, setDiscoverSource] = useState("local");
+  const [discoverSource, setDiscoverSource] = useState("google");
   const [discoverGoogleLoading, setDiscoverGoogleLoading] = useState(false);
   const [discoverGoogleResults, setDiscoverGoogleResults] = useState([]);
   const [monthFilter, setMonthFilter] = useState("all");
@@ -69,10 +69,19 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "discover" && discoverSource === "google" && !discoverGoogleResults.length && !discoverGoogleLoading) {
-      runDiscoverGoogleSearch();
+    if (activeTab !== "discover" || discoverSource !== "google") {
+      return;
     }
-  }, [activeTab, discoverSource]);
+    if (!search.trim() && city === "all") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      runDiscoverGoogleSearch();
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [activeTab, discoverSource, search, city]);
 
   async function bootstrap() {
     await Promise.all([loadRestaurants(), loadSession()]);
@@ -299,7 +308,16 @@ export default function HomePage() {
   }
 
   async function runDiscoverGoogleSearch() {
-    const query = search.trim() || "restaurants";
+    const queryText = search.trim();
+    const query =
+      queryText && city !== "all"
+        ? `restaurants in ${queryText}, ${city}`
+        : queryText
+          ? `restaurants in ${queryText}`
+          : city !== "all"
+            ? `restaurants in ${city}`
+            : "restaurants";
+
     const params = new URLSearchParams({ q: query });
     if (city !== "all") {
       params.set("location", city);
@@ -551,7 +569,7 @@ export default function HomePage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={discoverSource === "google" ? "Search Google Places" : "Name, tag, or neighborhood"}
+              placeholder={discoverSource === "google" ? "Search suburb/area (e.g. Fitzroy, Soho, Sawtelle)" : "Name, tag, or neighborhood"}
             />
             <label>Cuisine</label>
             <select value={cuisine} onChange={(e) => setCuisine(e.target.value)} disabled={discoverSource === "google"}>
@@ -677,7 +695,7 @@ export default function HomePage() {
               </form>
             </div>
             <div className="card">
-              <h2>Nearby Picks</h2>
+              <h2>{discoverSource === "google" ? "Nearby Picks (Google)" : "Nearby Picks"}</h2>
               <div className="restaurant-grid">
                 {discoverResults.map((item, idx) => {
                   if (discoverSource === "google") {
