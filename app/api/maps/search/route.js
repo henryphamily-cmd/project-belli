@@ -1,5 +1,6 @@
 import { badRequest } from "@/lib/api";
 import { readDb } from "@/lib/db";
+import { getRequestIp, rateLimit } from "@/lib/rate-limit";
 
 function toNumber(value) {
   const n = Number(value);
@@ -7,6 +8,27 @@ function toNumber(value) {
 }
 
 export async function GET(request) {
+  const ip = getRequestIp(request);
+  const limit = rateLimit({
+    key: `maps:${ip}`,
+    max: 1,
+    windowMs: 60000
+  });
+  if (!limit.allowed) {
+    return Response.json(
+      {
+        error: "Rate limit exceeded for map search.",
+        retryAfterSec: limit.retryAfterSec
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(limit.retryAfterSec)
+        }
+      }
+    );
+  }
+
   const key = process.env.GOOGLE_MAPS_API_KEY;
 
   const { searchParams } = new URL(request.url);
