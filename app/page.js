@@ -43,7 +43,6 @@ export default function HomePage() {
   const [sort, setSort] = useState("popular");
   const [monthFilter, setMonthFilter] = useState("all");
   const [mapsQuery, setMapsQuery] = useState("");
-  const [mapsLocation, setMapsLocation] = useState("");
   const [mapsLoading, setMapsLoading] = useState(false);
   const [mapsResults, setMapsResults] = useState([]);
   const [importingPlaceId, setImportingPlaceId] = useState("");
@@ -264,8 +263,7 @@ export default function HomePage() {
     setStatus("");
     try {
       const params = new URLSearchParams({
-        q: query,
-        location: mapsLocation.trim()
+        q: query
       });
       const res = await fetch(`/api/maps/search?${params.toString()}`, {
         credentials: "include"
@@ -521,17 +519,13 @@ export default function HomePage() {
           <section>
             <div className="card quick-log">
               <h2>Google Maps Search</h2>
-              <form className="inline-form" onSubmit={searchGoogleMaps}>
+              <form className="maps-search-form" onSubmit={searchGoogleMaps}>
                 <input
+                  className="maps-search-input"
                   value={mapsQuery}
                   onChange={(e) => setMapsQuery(e.target.value)}
-                  placeholder="Restaurant name (e.g. Noma)"
+                  placeholder="Search restaurants (e.g. Noma, sushi near me, tacos)"
                   required
-                />
-                <input
-                  value={mapsLocation}
-                  onChange={(e) => setMapsLocation(e.target.value)}
-                  placeholder="City or neighborhood (optional)"
                 />
                 <button className="btn solid" type="submit">
                   {mapsLoading ? "Searching..." : "Search Maps"}
