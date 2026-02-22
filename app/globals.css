@@ -385,10 +385,31 @@ main {
   align-items: baseline;
 }
 
-.manual-place-form {
-  margin-top: 0.8rem;
-  border-top: 1px solid var(--line);
-  padding-top: 0.8rem;
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 17, 15, 0.48);
+  display: grid;
+  place-items: center;
+  z-index: 40;
+  padding: 1rem;
+}
+
+.modal-card {
+  width: min(620px, 96vw);
+}
+
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.manual-modal-form {
+  display: grid;
+  gap: 0.35rem;
 }
 
 .profile-form {

@@ -47,6 +47,7 @@ export default function HomePage() {
   const [mapsLoading, setMapsLoading] = useState(false);
   const [mapsResults, setMapsResults] = useState([]);
   const [importingPlaceId, setImportingPlaceId] = useState("");
+  const [showManualModal, setShowManualModal] = useState(false);
   const [manualPlaceForm, setManualPlaceForm] = useState({
     name: "",
     city: "",
@@ -364,6 +365,7 @@ export default function HomePage() {
       cuisine: "Imported",
       priceLevel: "2"
     });
+    setShowManualModal(false);
   }
 
   const cuisines = useMemo(() => Array.from(new Set(restaurants.map((r) => r.cuisine))).sort(), [restaurants]);
@@ -534,6 +536,13 @@ export default function HomePage() {
                 <button className="btn solid" type="submit">
                   {mapsLoading ? "Searching..." : "Search Maps"}
                 </button>
+                <button
+                  className="btn ghost"
+                  type="button"
+                  onClick={() => setShowManualModal(true)}
+                >
+                  Add Manually
+                </button>
               </form>
               <div className="maps-results">
                 {mapsResults.map((place) => {
@@ -592,44 +601,6 @@ export default function HomePage() {
                   );
                 })}
               </div>
-              <form className="manual-place-form" onSubmit={addManualPlace}>
-                <h3>Quick Add Place (No API Key Needed)</h3>
-                <div className="inline-form">
-                  <input
-                    value={manualPlaceForm.name}
-                    onChange={(e) => setManualPlaceForm({ ...manualPlaceForm, name: e.target.value })}
-                    placeholder="Restaurant name"
-                    required
-                  />
-                  <input
-                    value={manualPlaceForm.city}
-                    onChange={(e) => setManualPlaceForm({ ...manualPlaceForm, city: e.target.value })}
-                    placeholder="City"
-                  />
-                  <input
-                    value={manualPlaceForm.address}
-                    onChange={(e) => setManualPlaceForm({ ...manualPlaceForm, address: e.target.value })}
-                    placeholder="Address"
-                  />
-                  <input
-                    value={manualPlaceForm.cuisine}
-                    onChange={(e) => setManualPlaceForm({ ...manualPlaceForm, cuisine: e.target.value })}
-                    placeholder="Cuisine"
-                  />
-                  <select
-                    value={manualPlaceForm.priceLevel}
-                    onChange={(e) => setManualPlaceForm({ ...manualPlaceForm, priceLevel: e.target.value })}
-                  >
-                    <option value="1">$</option>
-                    <option value="2">$$</option>
-                    <option value="3">$$$</option>
-                    <option value="4">$$$$</option>
-                  </select>
-                  <button className="btn small solid" type="submit">
-                    Add to Bellibox
-                  </button>
-                </div>
-              </form>
             </div>
             <div className="card quick-log">
               <h2>Log a Visit</h2>
@@ -847,6 +818,61 @@ export default function HomePage() {
             })}
           </div>
         </main>
+      )}
+
+      {showManualModal && (
+        <div className="modal-backdrop" onClick={() => setShowManualModal(false)}>
+          <div className="modal-card card" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-head">
+              <h2>Add Place Manually</h2>
+              <button className="btn small ghost" type="button" onClick={() => setShowManualModal(false)}>
+                Close
+              </button>
+            </header>
+            <form className="manual-modal-form" onSubmit={addManualPlace}>
+              <label>Restaurant name</label>
+              <input
+                value={manualPlaceForm.name}
+                onChange={(e) => setManualPlaceForm({ ...manualPlaceForm, name: e.target.value })}
+                placeholder="Restaurant name"
+                required
+              />
+              <label>City</label>
+              <input
+                value={manualPlaceForm.city}
+                onChange={(e) => setManualPlaceForm({ ...manualPlaceForm, city: e.target.value })}
+                placeholder="City"
+              />
+              <label>Address</label>
+              <input
+                value={manualPlaceForm.address}
+                onChange={(e) => setManualPlaceForm({ ...manualPlaceForm, address: e.target.value })}
+                placeholder="Address"
+              />
+              <label>Cuisine</label>
+              <input
+                value={manualPlaceForm.cuisine}
+                onChange={(e) => setManualPlaceForm({ ...manualPlaceForm, cuisine: e.target.value })}
+                placeholder="Cuisine"
+              />
+              <label>Price level</label>
+              <select
+                value={manualPlaceForm.priceLevel}
+                onChange={(e) => setManualPlaceForm({ ...manualPlaceForm, priceLevel: e.target.value })}
+              >
+                <option value="1">$</option>
+                <option value="2">$$</option>
+                <option value="3">$$$</option>
+                <option value="4">$$$$</option>
+              </select>
+              <div className="button-row">
+                <button className="btn solid" type="submit">
+                  Add to Bellibox
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
