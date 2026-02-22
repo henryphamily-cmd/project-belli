@@ -67,6 +67,7 @@ export async function GET(request) {
         lat: null,
         lng: null,
         openNow: null,
+        imageUrl: item.image || "",
         mapUrl:
           item.mapUrl ||
           `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${item.name} ${item.city}`)}`,
@@ -114,21 +115,27 @@ export async function GET(request) {
     );
   }
 
-  const results = (data.results || []).slice(0, 12).map((place) => ({
-    resultId: place.place_id || `google-${place.name}`,
-    placeId: place.place_id,
-    name: place.name,
-    address: place.formatted_address,
-    rating: place.rating || null,
-    userRatingsTotal: place.user_ratings_total || 0,
-    priceLevel: place.price_level || null,
-    lat: place.geometry?.location?.lat ?? null,
-    lng: place.geometry?.location?.lng ?? null,
-    openNow: place.opening_hours?.open_now ?? null,
-    mapUrl: place.place_id
-      ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(place.place_id)}`
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name} ${place.formatted_address || ""}`)}`
-  }));
+  const results = (data.results || []).slice(0, 12).map((place) => {
+    const photoRef = place.photos?.[0]?.photo_reference || "";
+    return {
+      resultId: place.place_id || `google-${place.name}`,
+      placeId: place.place_id,
+      name: place.name,
+      address: place.formatted_address,
+      rating: place.rating || null,
+      userRatingsTotal: place.user_ratings_total || 0,
+      priceLevel: place.price_level || null,
+      lat: place.geometry?.location?.lat ?? null,
+      lng: place.geometry?.location?.lng ?? null,
+      openNow: place.opening_hours?.open_now ?? null,
+      imageUrl: photoRef
+        ? `/api/maps/photo?ref=${encodeURIComponent(photoRef)}&maxwidth=800`
+        : "",
+      mapUrl: place.place_id
+        ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(place.place_id)}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name} ${place.formatted_address || ""}`)}`
+    };
+  });
 
   return Response.json({ results });
 }

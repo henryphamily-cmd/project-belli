@@ -378,6 +378,15 @@ main {
   background: linear-gradient(155deg, rgba(255, 255, 255, 0.94), rgba(255, 246, 237, 0.88));
 }
 
+.map-result-image {
+  width: 100%;
+  aspect-ratio: 16 / 8;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  margin-bottom: 0.6rem;
+}
+
 .map-result-item header {
   display: flex;
   justify-content: space-between;

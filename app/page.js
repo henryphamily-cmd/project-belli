@@ -41,6 +41,9 @@ export default function HomePage() {
   const [cuisine, setCuisine] = useState("all");
   const [city, setCity] = useState("all");
   const [sort, setSort] = useState("popular");
+  const [discoverSource, setDiscoverSource] = useState("local");
+  const [discoverGoogleLoading, setDiscoverGoogleLoading] = useState(false);
+  const [discoverGoogleResults, setDiscoverGoogleResults] = useState([]);
   const [monthFilter, setMonthFilter] = useState("all");
   const [mapsQuery, setMapsQuery] = useState("");
   const [mapsLoading, setMapsLoading] = useState(false);
@@ -64,6 +67,12 @@ export default function HomePage() {
   useEffect(() => {
     bootstrap();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "discover" && discoverSource === "google" && !discoverGoogleResults.length && !discoverGoogleLoading) {
+      runDiscoverGoogleSearch();
+    }
+  }, [activeTab, discoverSource]);
 
   async function bootstrap() {
     await Promise.all([loadRestaurants(), loadSession()]);
@@ -289,6 +298,36 @@ export default function HomePage() {
     }
   }
 
+  async function runDiscoverGoogleSearch() {
+    const query = search.trim() || "restaurants";
+    const params = new URLSearchParams({ q: query });
+    if (city !== "all") {
+      params.set("location", city);
+    }
+
+    setDiscoverGoogleLoading(true);
+    try {
+      const res = await fetch(`/api/maps/search?${params.toString()}`, {
+        credentials: "include"
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStatus(data.error || "Could not load Google discover results.");
+        setDiscoverGoogleResults([]);
+        return;
+      }
+      setDiscoverGoogleResults(data.results || []);
+      if (!data.results?.length) {
+        setStatus("No Google discover results.");
+      }
+    } catch (_err) {
+      setStatus("Could not load Google discover results.");
+      setDiscoverGoogleResults([]);
+    } finally {
+      setDiscoverGoogleLoading(false);
+    }
+  }
+
   async function importPlace(place, options = {}) {
     const { addToWatchlist = true, setForLog = true } = options;
     const markerId = String(place.resultId || place.placeId || place.name || "custom");
@@ -383,6 +422,13 @@ export default function HomePage() {
     });
     return filtered;
   }, [restaurants, search, cuisine, city, sort]);
+
+  const discoverResults = useMemo(() => {
+    if (discoverSource === "google") {
+      return discoverGoogleResults;
+    }
+    return filteredRestaurants;
+  }, [discoverSource, discoverGoogleResults, filteredRestaurants]);
 
   const restaurantMap = useMemo(() => {
     const map = new Map();
@@ -496,10 +542,19 @@ export default function HomePage() {
         <main id="view-discovery" className="active">
           <aside className="card control-panel">
             <h2>Discover Restaurants</h2>
+            <label>Data source</label>
+            <select value={discoverSource} onChange={(e) => setDiscoverSource(e.target.value)}>
+              <option value="local">Bellibox database</option>
+              <option value="google">Google live</option>
+            </select>
             <label>Search</label>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, tag, or neighborhood" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={discoverSource === "google" ? "Search Google Places" : "Name, tag, or neighborhood"}
+            />
             <label>Cuisine</label>
-            <select value={cuisine} onChange={(e) => setCuisine(e.target.value)}>
+            <select value={cuisine} onChange={(e) => setCuisine(e.target.value)} disabled={discoverSource === "google"}>
               <option value="all">All cuisines</option>
               {cuisines.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
@@ -509,12 +564,17 @@ export default function HomePage() {
               {cities.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
             <label>Sort</label>
-            <select value={sort} onChange={(e) => setSort(e.target.value)}>
+            <select value={sort} onChange={(e) => setSort(e.target.value)} disabled={discoverSource === "google"}>
               <option value="popular">Popular nearby</option>
               <option value="highest">Highest rated</option>
               <option value="price-low">Price low to high</option>
               <option value="price-high">Price high to low</option>
             </select>
+            {discoverSource === "google" && (
+              <button className="btn solid" type="button" onClick={runDiscoverGoogleSearch} style={{ marginTop: 10 }}>
+                {discoverGoogleLoading ? "Searching..." : "Search Google Discover"}
+              </button>
+            )}
           </aside>
           <section>
             <div className="card quick-log">
@@ -551,6 +611,9 @@ export default function HomePage() {
 
                   return (
                     <article key={place.resultId || `${place.name}-${place.address}`} className="map-result-item">
+                      {place.imageUrl ? (
+                        <img className="map-result-image" src={place.imageUrl} alt={place.name} loading="lazy" />
+                      ) : null}
                       <header>
                         <h3>{place.name}</h3>
                         <span className="meta-pill">
@@ -616,7 +679,50 @@ export default function HomePage() {
             <div className="card">
               <h2>Nearby Picks</h2>
               <div className="restaurant-grid">
-                {filteredRestaurants.map((r, idx) => {
+                {discoverResults.map((item, idx) => {
+                  if (discoverSource === "google") {
+                    const place = item;
+                    const importedId = place.placeId ? `g:${place.placeId}` : "";
+                    const exists = place.existingRestaurantId !== undefined
+                      ? restaurantIdSet.has(String(place.existingRestaurantId))
+                      : importedId
+                        ? restaurantIdSet.has(importedId)
+                        : false;
+                    const isImporting =
+                      importingPlaceId === String(place.resultId || place.placeId || place.name || "");
+
+                    return (
+                      <article key={place.resultId || `${place.name}-${place.address}`} className="restaurant-card reveal" style={{ "--delay": `${idx * 0.03}s` }}>
+                        {place.imageUrl ? (
+                          <img src={place.imageUrl} alt={place.name} loading="lazy" />
+                        ) : (
+                          <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80" alt={place.name} loading="lazy" />
+                        )}
+                        <h3>{place.name}</h3>
+                        <div className="meta-row">
+                          <span className="meta-pill">{place.priceLevel ? "$".repeat(place.priceLevel) : "N/A"}</span>
+                          <span className="meta-pill">{place.rating ? `${rating(place.rating)} stars` : "No rating"}</span>
+                          <span className="meta-pill">{place.userRatingsTotal || 0} reviews</span>
+                        </div>
+                        <p className="subtle">{place.address || "No address provided"}</p>
+                        <div className="button-row">
+                          <button
+                            className="btn small solid"
+                            type="button"
+                            disabled={isImporting}
+                            onClick={() => importPlace(place, { addToWatchlist: true, setForLog: true })}
+                          >
+                            {exists ? "Use in Bellibox" : isImporting ? "Importing..." : "Import to Bellibox"}
+                          </button>
+                          <a className="btn small ghost" href={place.mapUrl} target="_blank" rel="noreferrer">
+                            Open in Google Maps
+                          </a>
+                        </div>
+                      </article>
+                    );
+                  }
+
+                  const r = item;
                   const isSaved = user.watchlist.includes(r.id);
                   return (
                     <article key={r.id} className="restaurant-card reveal" style={{ "--delay": `${idx * 0.03}s` }}>
