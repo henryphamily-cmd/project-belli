@@ -537,6 +537,7 @@ export default function HomePage() {
 
   const cities = useMemo(() => Array.from(new Set(mergedRestaurants.map((r) => r.city))).sort(), [mergedRestaurants]);
   const discoverResults = discoverGoogleResults;
+  const hasDiscoverSearch = search.trim().length > 0;
 
   const restaurantMap = useMemo(() => {
     const map = new Map();
@@ -665,8 +666,8 @@ export default function HomePage() {
               {discoverGoogleLoading ? "Searching..." : "Discover"}
             </button>
           </aside>
-          <section>
-            <div className="card quick-log">
+          <section className={`discover-stack ${hasDiscoverSearch ? "reorder-nearby" : ""}`}>
+            <div className="card quick-log search-restaurant-card">
               <h2>Search Restaurant</h2>
               <form className="maps-search-form" onSubmit={searchGoogleMaps}>
                 <input
@@ -748,7 +749,7 @@ export default function HomePage() {
                 })}
               </div>
             </div>
-            <div className="card quick-log">
+            <div className="card quick-log log-visit-card">
               <h2>Log a Visit</h2>
               <form onSubmit={saveLog}>
                 <label>Restaurant</label>
@@ -771,7 +772,7 @@ export default function HomePage() {
                 <button className="btn solid" type="submit">Save Log</button>
               </form>
             </div>
-            <div className="card">
+            <div className="card nearby-picks-card">
               <h2>Nearby Picks</h2>
               <div className="restaurant-grid">
                 {discoverResults.map((place, idx) => {

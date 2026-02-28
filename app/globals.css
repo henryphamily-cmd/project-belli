@@ -416,6 +416,52 @@ main {
   box-shadow: 0 0 0 3px rgba(211, 79, 47, 0.15);
 }
 
+.discover-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.search-restaurant-card,
+.nearby-picks-card {
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.discover-stack.reorder-nearby .nearby-picks-card {
+  order: 1;
+  animation: discover-slide-up 0.25s ease-out;
+}
+
+.discover-stack.reorder-nearby .log-visit-card {
+  order: 2;
+}
+
+.discover-stack.reorder-nearby .search-restaurant-card {
+  order: 3;
+  animation: discover-slide-down 0.25s ease-out;
+}
+
+@keyframes discover-slide-up {
+  from {
+    transform: translateY(12px);
+    opacity: 0.88;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes discover-slide-down {
+  from {
+    transform: translateY(-10px);
+    opacity: 0.9;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
