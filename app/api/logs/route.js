@@ -6,7 +6,7 @@ function clampRating(value) {
   const parsed = Number(value);
   const safe = Number.isFinite(parsed) ? parsed : 4;
   const snapped = Math.round(safe * 2) / 2;
-  return Math.min(5, Math.max(0.5, snapped));
+  return Math.min(5, Math.max(0, snapped));
 }
 
 export async function GET(request) {

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const TABS = ["discover", "lists", "diary", "feed", "profile"];
+const RATING_OPTIONS = Array.from({ length: 11 }, (_, i) => i * 0.5);
 const LOCAL_IMPORTED_KEY = "bellibox_local_imported_restaurants_v1";
 const LOCAL_LOGS_KEY = "bellibox_local_logs_v1";
 
@@ -755,8 +756,14 @@ export default function HomePage() {
                   <option value="">Select a restaurant</option>
                   {mergedRestaurants.map((r) => <option key={r.id} value={r.id}>{r.name} - {r.city}</option>)}
                 </select>
-                <label>Rating (0.5 to 5)</label>
-                <input type="number" min="0.5" max="5" step="0.5" value={logForm.rating} onChange={(e) => setLogForm({ ...logForm, rating: e.target.value })} required />
+                <label>Rating (0 to 5)</label>
+                <select value={logForm.rating} onChange={(e) => setLogForm({ ...logForm, rating: e.target.value })} required>
+                  {RATING_OPTIONS.map((value) => (
+                    <option key={value} value={value.toString()}>
+                      {value.toFixed(1).replace(".0", "")}
+                    </option>
+                  ))}
+                </select>
                 <label>Date</label>
                 <input type="date" value={logForm.date} onChange={(e) => setLogForm({ ...logForm, date: e.target.value })} required />
                 <label>Quick note</label>
