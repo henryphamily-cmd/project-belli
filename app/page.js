@@ -273,7 +273,7 @@ export default function HomePage() {
     e.preventDefault();
     const query = mapsQuery.trim();
     if (!query) {
-      setStatus("Enter a restaurant name to search Google Maps.");
+      setStatus("Enter a restaurant name to search.");
       return;
     }
 
@@ -288,19 +288,19 @@ export default function HomePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setStatus(data.error || "Google Maps search failed.");
+        setStatus(data.error || "Search failed.");
         setMapsResults([]);
         return;
       }
       setMapsResults(data.results || []);
       if (data.warning) {
-        setStatus(data.warning);
+        setStatus("Showing local matches.");
       }
       if (!data.results?.length) {
-        setStatus("No Google Maps results found.");
+        setStatus("No results found.");
       }
     } catch (_err) {
-      setStatus("Could not reach Google Maps search.");
+      setStatus("Could not reach search.");
       setMapsResults([]);
     } finally {
       setMapsLoading(false);
@@ -330,16 +330,16 @@ export default function HomePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setStatus(data.error || "Could not load Google discover results.");
+        setStatus(data.error || "Could not load discover results.");
         setDiscoverGoogleResults([]);
         return;
       }
       setDiscoverGoogleResults(data.results || []);
       if (!data.results?.length) {
-        setStatus("No Google discover results.");
+        setStatus("No discover results.");
       }
     } catch (_err) {
-      setStatus("Could not load Google discover results.");
+      setStatus("Could not load discover results.");
       setDiscoverGoogleResults([]);
     } finally {
       setDiscoverGoogleLoading(false);
@@ -563,7 +563,7 @@ export default function HomePage() {
             <label>Data source</label>
             <select value={discoverSource} onChange={(e) => setDiscoverSource(e.target.value)}>
               <option value="local">Bellibox database</option>
-              <option value="google">Google live</option>
+              <option value="google">Live places</option>
             </select>
             <label>Search</label>
             <input
@@ -590,13 +590,13 @@ export default function HomePage() {
             </select>
             {discoverSource === "google" && (
               <button className="btn solid" type="button" onClick={runDiscoverGoogleSearch} style={{ marginTop: 10 }}>
-                {discoverGoogleLoading ? "Searching..." : "Search Google Discover"}
+                {discoverGoogleLoading ? "Searching..." : "Discover"}
               </button>
             )}
           </aside>
           <section>
             <div className="card quick-log">
-              <h2>Google Maps Search</h2>
+              <h2>Search Restaurant</h2>
               <form className="maps-search-form" onSubmit={searchGoogleMaps}>
                 <input
                   className="maps-search-input"
@@ -669,7 +669,7 @@ export default function HomePage() {
                           target="_blank"
                           rel="noreferrer"
                         >
-                          Open in Google Maps
+                          Open in Maps
                         </a>
                       </div>
                     </article>
@@ -695,7 +695,7 @@ export default function HomePage() {
               </form>
             </div>
             <div className="card">
-              <h2>{discoverSource === "google" ? "Nearby Picks (Google)" : "Nearby Picks"}</h2>
+              <h2>Nearby Picks</h2>
               <div className="restaurant-grid">
                 {discoverResults.map((item, idx) => {
                   if (discoverSource === "google") {
@@ -733,7 +733,7 @@ export default function HomePage() {
                             {exists ? "Use in Bellibox" : isImporting ? "Importing..." : "Import to Bellibox"}
                           </button>
                           <a className="btn small ghost" href={place.mapUrl} target="_blank" rel="noreferrer">
-                            Open in Google Maps
+                            Open in Maps
                           </a>
                         </div>
                       </article>
