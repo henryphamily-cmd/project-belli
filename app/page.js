@@ -3,6 +3,25 @@
 import { useEffect, useMemo, useState } from "react";
 
 const TABS = ["discover", "lists", "diary", "feed", "profile"];
+const LOCAL_IMPORTED_KEY = "bellibox_local_imported_restaurants_v1";
+const LOCAL_LOGS_KEY = "bellibox_local_logs_v1";
+
+function readLocalArray(key) {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_err) {
+    return [];
+  }
+}
+
+function writeLocalArray(key, value) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
 
 function todayIso() {
   const now = new Date();
@@ -33,6 +52,10 @@ function sameId(a, b) {
 export default function HomePage() {
   const [user, setUser] = useState(null);
   const [restaurants, setRestaurants] = useState([]);
+  const [localImportedRestaurants, setLocalImportedRestaurants] = useState(() =>
+    readLocalArray(LOCAL_IMPORTED_KEY)
+  );
+  const [localLogs, setLocalLogs] = useState(() => readLocalArray(LOCAL_LOGS_KEY));
   const [feed, setFeed] = useState([]);
   const [activeTab, setActiveTab] = useState("discover");
   const [status, setStatus] = useState("");
@@ -80,6 +103,39 @@ export default function HomePage() {
     return () => window.clearTimeout(timer);
   }, [activeTab, search, city]);
 
+  function mergeLocalLogs(serverUser) {
+    if (!serverUser) return serverUser;
+    const serverLogs = Array.isArray(serverUser.logs) ? serverUser.logs : [];
+    const merged = [...localLogs, ...serverLogs];
+    return {
+      ...serverUser,
+      logs: merged
+    };
+  }
+
+  function buildLocalRestaurantFromPlace(place) {
+    const name = String(place?.name || "").trim();
+    const address = String(place?.address || "").trim();
+    const placeId = String(place?.placeId || "").trim();
+    const id = placeId ? `local:g:${placeId}` : `local:${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    const parts = address.split(",").map((x) => x.trim()).filter(Boolean);
+    const cityGuess = parts.length >= 2 ? parts[parts.length - 2] : parts[0] || "Unknown";
+
+    return {
+      id,
+      name: name || "Imported Place",
+      cuisine: "Imported",
+      city: cityGuess,
+      neighborhood: address || "Imported from search",
+      price: Number(place?.priceLevel) || 2,
+      popularity: Number.isFinite(Number(place?.rating)) ? Math.round(Number(place.rating) * 20) : 70,
+      tags: ["imported", "local"],
+      image: place?.imageUrl || "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80",
+      mapUrl: String(place?.mapUrl || ""),
+      source: "local"
+    };
+  }
+
   async function bootstrap() {
     await Promise.all([loadRestaurants(), loadSession()]);
   }
@@ -88,7 +144,7 @@ export default function HomePage() {
     const res = await fetch("/api/auth/me", { credentials: "include" });
     if (!res.ok) return;
     const data = await res.json();
-    setUser(data.user);
+    setUser(mergeLocalLogs(data.user));
     setLogForm((prev) => ({ ...prev, restaurantId: String(data.user.watchlist[0] || data.user.logs[0]?.restaurantId || "") }));
     loadFeed();
   }
@@ -118,7 +174,7 @@ export default function HomePage() {
       setStatus(data.error || "Login failed");
       return;
     }
-    setUser(data.user);
+    setUser(mergeLocalLogs(data.user));
     setStatus("Logged in.");
     setLogForm((prev) => ({ ...prev, restaurantId: String(data.user.watchlist[0] || "") }));
     loadFeed();
@@ -137,7 +193,7 @@ export default function HomePage() {
       setStatus(data.error || "Registration failed");
       return;
     }
-    setUser(data.user);
+    setUser(mergeLocalLogs(data.user));
     setStatus("Account created.");
     setRegisterForm({ name: "", email: "", password: "" });
     loadFeed();
@@ -161,6 +217,10 @@ export default function HomePage() {
 
   async function resetDemoData() {
     await fetch("/api/bootstrap", { method: "POST" });
+    setLocalImportedRestaurants([]);
+    setLocalLogs([]);
+    writeLocalArray(LOCAL_IMPORTED_KEY, []);
+    writeLocalArray(LOCAL_LOGS_KEY, []);
     setStatus("Demo database reset.");
     await loadRestaurants();
     await login("demo@bellibox.app", "demo123");
@@ -170,7 +230,7 @@ export default function HomePage() {
     const res = await fetch("/api/auth/me", { credentials: "include" });
     if (!res.ok) return;
     const data = await res.json();
-    setUser(data.user);
+    setUser(mergeLocalLogs(data.user));
   }
 
   async function saveLog(e) {
@@ -188,12 +248,34 @@ export default function HomePage() {
     });
     const data = await res.json();
     if (!res.ok) {
-      setStatus(data.error || "Could not save log");
+      const selectedId = String(logForm.restaurantId || "");
+      const isLocalOnly = selectedId.startsWith("local:");
+      if (!isLocalOnly) {
+        setStatus(data.error || "Could not save log");
+        return;
+      }
+
+      const localEntry = {
+        id: `local-log-${Date.now()}`,
+        restaurantId: selectedId,
+        rating: Number(logForm.rating),
+        date: logForm.date,
+        note: logForm.note
+      };
+      const nextLocalLogs = [localEntry, ...localLogs];
+      setLocalLogs(nextLocalLogs);
+      writeLocalArray(LOCAL_LOGS_KEY, nextLocalLogs);
+      setUser((prev) => ({
+        ...prev,
+        logs: [localEntry, ...(prev?.logs || [])]
+      }));
+      setStatus("Visit logged to local Bellibox data.");
+      setLogForm((prev) => ({ ...prev, rating: "4", note: "", date: todayIso() }));
       return;
     }
     setUser((prev) => ({
       ...prev,
-      logs: data.logs,
+      logs: [...localLogs, ...data.logs],
       watchlist: prev.watchlist.filter((id) => !sameId(id, logForm.restaurantId))
     }));
     setStatus("Visit logged.");
@@ -369,9 +451,27 @@ export default function HomePage() {
         credentials: "include",
         body: JSON.stringify({ place })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setStatus(data.error || "Could not import place.");
+        const localRestaurant = buildLocalRestaurantFromPlace(place);
+        const existingLocal = localImportedRestaurants.find(
+          (item) =>
+            String(item.name).toLowerCase() === String(localRestaurant.name).toLowerCase() &&
+            String(item.neighborhood).toLowerCase() === String(localRestaurant.neighborhood).toLowerCase()
+        );
+        const nextRestaurant = existingLocal || localRestaurant;
+        const nextLocal = existingLocal
+          ? localImportedRestaurants
+          : [localRestaurant, ...localImportedRestaurants];
+
+        if (!existingLocal) {
+          setLocalImportedRestaurants(nextLocal);
+          writeLocalArray(LOCAL_IMPORTED_KEY, nextLocal);
+        }
+        if (setForLog) {
+          setLogForm((prev) => ({ ...prev, restaurantId: String(nextRestaurant.id) }));
+        }
+        setStatus("Restaurant imported to local Bellibox data.");
         return;
       }
 
@@ -386,7 +486,14 @@ export default function HomePage() {
       }
       setStatus(data.created ? "Restaurant imported into Bellibox." : "Restaurant already exists in Bellibox.");
     } catch (_error) {
-      setStatus("Import failed.");
+      const localRestaurant = buildLocalRestaurantFromPlace(place);
+      const nextLocal = [localRestaurant, ...localImportedRestaurants];
+      setLocalImportedRestaurants(nextLocal);
+      writeLocalArray(LOCAL_IMPORTED_KEY, nextLocal);
+      if (setForLog) {
+        setLogForm((prev) => ({ ...prev, restaurantId: String(localRestaurant.id) }));
+      }
+      setStatus("Restaurant imported to local Bellibox data.");
     } finally {
       setImportingPlaceId("");
     }
@@ -420,18 +527,25 @@ export default function HomePage() {
     setShowManualModal(false);
   }
 
-  const cities = useMemo(() => Array.from(new Set(restaurants.map((r) => r.city))).sort(), [restaurants]);
+  const mergedRestaurants = useMemo(() => {
+    const map = new Map();
+    localImportedRestaurants.forEach((item) => map.set(String(item.id), item));
+    restaurants.forEach((item) => map.set(String(item.id), item));
+    return Array.from(map.values());
+  }, [restaurants, localImportedRestaurants]);
+
+  const cities = useMemo(() => Array.from(new Set(mergedRestaurants.map((r) => r.city))).sort(), [mergedRestaurants]);
   const discoverResults = discoverGoogleResults;
 
   const restaurantMap = useMemo(() => {
     const map = new Map();
-    restaurants.forEach((item) => map.set(item.id, item));
+    mergedRestaurants.forEach((item) => map.set(item.id, item));
     return map;
-  }, [restaurants]);
+  }, [mergedRestaurants]);
 
   const restaurantIdSet = useMemo(
-    () => new Set(restaurants.map((item) => String(item.id))),
-    [restaurants]
+    () => new Set(mergedRestaurants.map((item) => String(item.id))),
+    [mergedRestaurants]
   );
 
   const months = useMemo(
@@ -639,7 +753,7 @@ export default function HomePage() {
                 <label>Restaurant</label>
                 <select value={logForm.restaurantId} onChange={(e) => setLogForm({ ...logForm, restaurantId: e.target.value })} required>
                   <option value="">Select a restaurant</option>
-                  {restaurants.map((r) => <option key={r.id} value={r.id}>{r.name} - {r.city}</option>)}
+                  {mergedRestaurants.map((r) => <option key={r.id} value={r.id}>{r.name} - {r.city}</option>)}
                 </select>
                 <label>Rating (0.5 to 5)</label>
                 <input type="number" min="0.5" max="5" step="0.5" value={logForm.rating} onChange={(e) => setLogForm({ ...logForm, rating: e.target.value })} required />
@@ -754,7 +868,9 @@ export default function HomePage() {
                 <div className="inline-form">
                   <select defaultValue="" onChange={(e) => e.target.dataset.selected = e.target.value}>
                     <option value="">Add a restaurant</option>
-                    {restaurants.filter((r) => !list.itemIds.includes(r.id)).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    {mergedRestaurants
+                      .filter((r) => !list.itemIds.some((id) => sameId(id, r.id)))
+                      .map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                   <button className="btn small solid" type="button" onClick={(e) => {
                     const select = e.currentTarget.parentElement.querySelector("select");
