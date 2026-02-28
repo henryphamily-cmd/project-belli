@@ -38,10 +38,7 @@ export default function HomePage() {
   const [status, setStatus] = useState("");
 
   const [search, setSearch] = useState("");
-  const [cuisine, setCuisine] = useState("all");
   const [city, setCity] = useState("all");
-  const [sort, setSort] = useState("popular");
-  const [discoverSource, setDiscoverSource] = useState("google");
   const [discoverGoogleLoading, setDiscoverGoogleLoading] = useState(false);
   const [discoverGoogleResults, setDiscoverGoogleResults] = useState([]);
   const [monthFilter, setMonthFilter] = useState("all");
@@ -69,7 +66,7 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "discover" || discoverSource !== "google") {
+    if (activeTab !== "discover") {
       return;
     }
     if (!search.trim() && city === "all") {
@@ -81,7 +78,7 @@ export default function HomePage() {
     }, 700);
 
     return () => window.clearTimeout(timer);
-  }, [activeTab, discoverSource, search, city]);
+  }, [activeTab, search, city]);
 
   async function bootstrap() {
     await Promise.all([loadRestaurants(), loadSession()]);
@@ -423,30 +420,8 @@ export default function HomePage() {
     setShowManualModal(false);
   }
 
-  const cuisines = useMemo(() => Array.from(new Set(restaurants.map((r) => r.cuisine))).sort(), [restaurants]);
   const cities = useMemo(() => Array.from(new Set(restaurants.map((r) => r.city))).sort(), [restaurants]);
-
-  const filteredRestaurants = useMemo(() => {
-    const filtered = restaurants.filter((item) => {
-      const q = `${item.name} ${item.city} ${item.neighborhood} ${(item.tags || []).join(" ")}`.toLowerCase();
-      return (search ? q.includes(search.toLowerCase()) : true) && (cuisine === "all" || item.cuisine === cuisine) && (city === "all" || item.city === city);
-    });
-
-    filtered.sort((a, b) => {
-      if (sort === "highest") return (b.community?.avg || 0) - (a.community?.avg || 0);
-      if (sort === "price-low") return a.price - b.price;
-      if (sort === "price-high") return b.price - a.price;
-      return b.popularity - a.popularity;
-    });
-    return filtered;
-  }, [restaurants, search, cuisine, city, sort]);
-
-  const discoverResults = useMemo(() => {
-    if (discoverSource === "google") {
-      return discoverGoogleResults;
-    }
-    return filteredRestaurants;
-  }, [discoverSource, discoverGoogleResults, filteredRestaurants]);
+  const discoverResults = discoverGoogleResults;
 
   const restaurantMap = useMemo(() => {
     const map = new Map();
@@ -560,39 +535,20 @@ export default function HomePage() {
         <main id="view-discovery" className="active">
           <aside className="card control-panel">
             <h2>Discover Restaurants</h2>
-            <label>Data source</label>
-            <select value={discoverSource} onChange={(e) => setDiscoverSource(e.target.value)}>
-              <option value="local">Bellibox database</option>
-              <option value="google">Live places</option>
-            </select>
             <label>Search</label>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={discoverSource === "google" ? "Search suburb/area (e.g. Fitzroy, Soho, Sawtelle)" : "Name, tag, or neighborhood"}
+              placeholder="Search suburb/area (e.g. Fitzroy, Soho, Sawtelle)"
             />
-            <label>Cuisine</label>
-            <select value={cuisine} onChange={(e) => setCuisine(e.target.value)} disabled={discoverSource === "google"}>
-              <option value="all">All cuisines</option>
-              {cuisines.map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
             <label>City</label>
             <select value={city} onChange={(e) => setCity(e.target.value)}>
               <option value="all">All cities</option>
               {cities.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
-            <label>Sort</label>
-            <select value={sort} onChange={(e) => setSort(e.target.value)} disabled={discoverSource === "google"}>
-              <option value="popular">Popular nearby</option>
-              <option value="highest">Highest rated</option>
-              <option value="price-low">Price low to high</option>
-              <option value="price-high">Price high to low</option>
-            </select>
-            {discoverSource === "google" && (
-              <button className="btn solid" type="button" onClick={runDiscoverGoogleSearch} style={{ marginTop: 10 }}>
-                {discoverGoogleLoading ? "Searching..." : "Discover"}
-              </button>
-            )}
+            <button className="btn solid" type="button" onClick={runDiscoverGoogleSearch} style={{ marginTop: 10 }}>
+              {discoverGoogleLoading ? "Searching..." : "Discover"}
+            </button>
           </aside>
           <section>
             <div className="card quick-log">
@@ -697,65 +653,42 @@ export default function HomePage() {
             <div className="card">
               <h2>Nearby Picks</h2>
               <div className="restaurant-grid">
-                {discoverResults.map((item, idx) => {
-                  if (discoverSource === "google") {
-                    const place = item;
-                    const importedId = place.placeId ? `g:${place.placeId}` : "";
-                    const exists = place.existingRestaurantId !== undefined
-                      ? restaurantIdSet.has(String(place.existingRestaurantId))
-                      : importedId
-                        ? restaurantIdSet.has(importedId)
-                        : false;
-                    const isImporting =
-                      importingPlaceId === String(place.resultId || place.placeId || place.name || "");
+                {discoverResults.map((place, idx) => {
+                  const importedId = place.placeId ? `g:${place.placeId}` : "";
+                  const exists = place.existingRestaurantId !== undefined
+                    ? restaurantIdSet.has(String(place.existingRestaurantId))
+                    : importedId
+                      ? restaurantIdSet.has(importedId)
+                      : false;
+                  const isImporting =
+                    importingPlaceId === String(place.resultId || place.placeId || place.name || "");
 
-                    return (
-                      <article key={place.resultId || `${place.name}-${place.address}`} className="restaurant-card reveal" style={{ "--delay": `${idx * 0.03}s` }}>
-                        {place.imageUrl ? (
-                          <img src={place.imageUrl} alt={place.name} loading="lazy" />
-                        ) : (
-                          <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80" alt={place.name} loading="lazy" />
-                        )}
-                        <h3>{place.name}</h3>
-                        <div className="meta-row">
-                          <span className="meta-pill">{place.priceLevel ? "$".repeat(place.priceLevel) : "N/A"}</span>
-                          <span className="meta-pill">{place.rating ? `${rating(place.rating)} stars` : "No rating"}</span>
-                          <span className="meta-pill">{place.userRatingsTotal || 0} reviews</span>
-                        </div>
-                        <p className="subtle">{place.address || "No address provided"}</p>
-                        <div className="button-row">
-                          <button
-                            className="btn small solid"
-                            type="button"
-                            disabled={isImporting}
-                            onClick={() => importPlace(place, { addToWatchlist: true, setForLog: true })}
-                          >
-                            {exists ? "Use in Bellibox" : isImporting ? "Importing..." : "Import to Bellibox"}
-                          </button>
-                          <a className="btn small ghost" href={place.mapUrl} target="_blank" rel="noreferrer">
-                            Open in Maps
-                          </a>
-                        </div>
-                      </article>
-                    );
-                  }
-
-                  const r = item;
-                  const isSaved = user.watchlist.includes(r.id);
                   return (
-                    <article key={r.id} className="restaurant-card reveal" style={{ "--delay": `${idx * 0.03}s` }}>
-                      <img src={r.image} alt={r.name} loading="lazy" />
-                      <h3>{r.name}</h3>
+                    <article key={place.resultId || `${place.name}-${place.address}`} className="restaurant-card reveal" style={{ "--delay": `${idx * 0.03}s` }}>
+                      {place.imageUrl ? (
+                        <img src={place.imageUrl} alt={place.name} loading="lazy" />
+                      ) : (
+                        <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80" alt={place.name} loading="lazy" />
+                      )}
+                      <h3>{place.name}</h3>
                       <div className="meta-row">
-                        <span className="meta-pill">{r.cuisine}</span>
-                        <span className="meta-pill">{r.city}</span>
-                        <span className="meta-pill">{price(r.price)}</span>
+                        <span className="meta-pill">{place.priceLevel ? "$".repeat(place.priceLevel) : "N/A"}</span>
+                        <span className="meta-pill">{place.rating ? `${rating(place.rating)} stars` : "No rating"}</span>
+                        <span className="meta-pill">{place.userRatingsTotal || 0} reviews</span>
                       </div>
-                      <p className="subtle">{r.neighborhood}</p>
-                      <p className="rating">{r.community.count ? `${rating(r.community.avg)} avg from ${r.community.count} logs` : "No ratings yet"}</p>
+                      <p className="subtle">{place.address || "No address provided"}</p>
                       <div className="button-row">
-                        <button className="btn small ghost" onClick={() => toggleWatch(r.id, "toggle")}>{isSaved ? "Remove Want to Try" : "Want to Try"}</button>
-                        <button className="btn small solid" onClick={() => setLogForm({ ...logForm, restaurantId: String(r.id) })}>Log Visit</button>
+                        <button
+                          className="btn small solid"
+                          type="button"
+                          disabled={isImporting}
+                          onClick={() => importPlace(place, { addToWatchlist: true, setForLog: true })}
+                        >
+                          {exists ? "Use in Bellibox" : isImporting ? "Importing..." : "Import to Bellibox"}
+                        </button>
+                        <a className="btn small ghost" href={place.mapUrl} target="_blank" rel="noreferrer">
+                          Open in Maps
+                        </a>
                       </div>
                     </article>
                   );
